@@ -209,7 +209,6 @@ int main(void)
 //                printf("Out called");
                 new_fd = events[i].data.fd;
 
-
                 /// Form request
                 snprintf(sendline, 4096,
                         "HTTP/1.0 200 OK\r\nDate: Mon, 1 Jan 1996 01:01:01 GMT\r\n"
@@ -218,13 +217,10 @@ int main(void)
 
 
                 write(new_fd, sendline, sizeof(sendline));
-
-//reset path
-                bzero((char *)&path, sizeof(path));
-// reset buffer
+                // reset buffer
                 bzero((char *)&sendline, sizeof(sendline));
-
-
+                bzero((char *)&buf, sizeof(buf));
+                buflen = 0;
 
                 ev.data.fd = new_fd;
                 ev.events = EPOLLIN | EPOLLET;
