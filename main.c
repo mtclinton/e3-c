@@ -11,6 +11,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "picohttpparser.h"
+
+
 #define PORT "8885"   // Port we're listening on
 #define MAXLINE		4096
 
@@ -32,6 +35,13 @@ int main(void)
     char line[MAXLINE];
 
     ssize_t n;
+
+    // new types for pico parser
+    char buf[4096], *method, *path;
+    int pret, minor_version;
+    struct phr_header headers[100];
+    size_t buflen = 0, prevbuflen = 0, method_len, path_len, num_headers;
+    ssize_t rret;
 
 
     // !! don't forget your error checking for these calls !!
@@ -151,7 +161,7 @@ int main(void)
                 }
             } else if(events[i].events & EPOLLIN) {
                 if((new_fd = events[i].data.fd) < 0) continue;
-                if((n = read(new_fd, line, MAXLINE)) < 0) {
+                if((rret = read(new_fd,  buf + buflen, sizeof(buf) - buflen)) < 0) {
                     if(errno == ECONNRESET) {
                         close(new_fd);
                         events[i].data.fd = -1;
@@ -159,13 +169,33 @@ int main(void)
                     } else {
                         printf("readline error");
                     }
-                } else if(n == 0) {
+                } else if(rret == 0) {
                     printf("closed new_fd");
                     close(new_fd);
                     events[i].data.fd = -1;
                 }
 
-                printf("received data: %s\n", line);
+                prevbuflen = buflen;
+                buflen += rret;
+                num_headers = sizeof(headers) / sizeof(headers[0]);
+
+
+                pret = phr_parse_request(buf, buflen, &method, &method_len, &path, &path_len,
+                                         &minor_version, headers, &num_headers, prevbuflen);
+
+                // TODO error checking on pret
+
+//                printf("received data: %s\n", line);
+
+                printf("request is %d bytes long\n", pret);
+                printf("method is %.*s\n", (int)method_len, method);
+                printf("path is %.*s\n", (int)path_len, path);
+                printf("HTTP version is 1.%d\n", minor_version);
+                printf("headers:\n");
+                for (i = 0; i != num_headers; ++i) {
+                    printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name,
+                           (int)headers[i].value_len, headers[i].value);
+                }
 
                 ev.data.fd = new_fd;
                 ev.events = EPOLLOUT | EPOLLET;
