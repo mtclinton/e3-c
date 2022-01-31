@@ -23,6 +23,9 @@ int main(void)
     struct sockaddr_storage their_addr;
     socklen_t addr_size;
 
+    // should minus 1?
+    char sendline[4096];
+
     struct addrinfo hints, *res, *p;
     int sockfd, new_fd, epfd, nfds,  conn_sock, i;
 
@@ -132,7 +135,7 @@ int main(void)
             if (events[i].data.fd == sockfd) {
                 addr_size = sizeof their_addr;
                 // error here:
-                printf("accept--\n");
+//                printf("accept--\n");
                 conn_sock = accept(sockfd, (struct sockaddr *) &their_addr, &addr_size);
                 if (conn_sock == -1) {
                     perror("accept");
@@ -170,7 +173,7 @@ int main(void)
                         printf("readline error");
                     }
                 } else if(rret == 0) {
-                    printf("closed new_fd");
+                    printf("closed new_fd\n");
                     close(new_fd);
                     events[i].data.fd = -1;
                 }
@@ -187,15 +190,15 @@ int main(void)
 
 //                printf("received data: %s\n", line);
 
-                printf("request is %d bytes long\n", pret);
-                printf("method is %.*s\n", (int)method_len, method);
-                printf("path is %.*s\n", (int)path_len, path);
-                printf("HTTP version is 1.%d\n", minor_version);
-                printf("headers:\n");
-                for (i = 0; i != num_headers; ++i) {
-                    printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name,
-                           (int)headers[i].value_len, headers[i].value);
-                }
+//                printf("request is %d bytes long\n", pret);
+//                printf("method is %.*s\n", (int)method_len, method);
+//                printf("path is %.*s\n", (int)path_len, path);
+//                printf("HTTP version is 1.%d\n", minor_version);
+//                printf("headers:\n");
+//                for (i = 0; i != num_headers; ++i) {
+//                    printf("%.*s: %.*s\n", (int)headers[i].name_len, headers[i].name,
+//                           (int)headers[i].value_len, headers[i].value);
+//                }
 
                 ev.data.fd = new_fd;
                 ev.events = EPOLLOUT | EPOLLET;
@@ -203,11 +206,25 @@ int main(void)
                 epoll_ctl(epfd, EPOLL_CTL_MOD, new_fd, &ev);
             }
             else if(events[i].events & EPOLLOUT) {
-                printf("Out called");
+//                printf("Out called");
                 new_fd = events[i].data.fd;
-                write(new_fd, line, n);
 
-                printf("written data: %s\n", line);
+
+                /// Form request
+                snprintf(sendline, 4096,
+                        "HTTP/1.0 200 OK\r\nDate: Mon, 1 Jan 1996 01:01:01 GMT\r\n"
+                        "Content-Type: text/plain\r\nContent-Length: %d\r\n\r\n"
+                        "%s\r\n", (unsigned int)strlen(path), path);
+
+
+                write(new_fd, sendline, sizeof(sendline));
+
+//reset path
+                bzero((char *)&path, sizeof(path));
+// reset buffer
+                bzero((char *)&sendline, sizeof(sendline));
+
+
 
                 ev.data.fd = new_fd;
                 ev.events = EPOLLIN | EPOLLET;
