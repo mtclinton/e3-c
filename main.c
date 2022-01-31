@@ -12,7 +12,7 @@
 #include <errno.h>
 
 #define PORT "8885"   // Port we're listening on
-#define MAXLINE		10
+#define MAXLINE		4096
 
 // Main
 int main(void)
@@ -21,7 +21,7 @@ int main(void)
     socklen_t addr_size;
 
     struct addrinfo hints, *res, *p;
-    int sockfd, new_fd, epfd, nfds, n, conn_sock;
+    int sockfd, new_fd, epfd, nfds,  conn_sock, i;
 
     int rv;
 
@@ -30,6 +30,9 @@ int main(void)
     int MAX_EVENTS = 20;
 
     char line[MAXLINE];
+
+    ssize_t n;
+
 
     // !! don't forget your error checking for these calls !!
 
@@ -115,8 +118,8 @@ int main(void)
             exit(EXIT_FAILURE);
         }
 
-        for (n = 0; n < nfds; ++n) {
-            if (events[n].data.fd == sockfd) {
+        for (i = 0; i < nfds; ++i) {
+            if (events[i].data.fd == sockfd) {
                 addr_size = sizeof their_addr;
                 // error here:
                 printf("accept--\n");
@@ -146,12 +149,12 @@ int main(void)
                     perror("epoll_ctl: conn_sock");
                     exit(EXIT_FAILURE);
                 }
-            } else if(events[n].events & EPOLLIN) {
-                if((new_fd = events[n].data.fd) < 0) continue;
+            } else if(events[i].events & EPOLLIN) {
+                if((new_fd = events[i].data.fd) < 0) continue;
                 if((n = read(new_fd, line, MAXLINE)) < 0) {
                     if(errno == ECONNRESET) {
                         close(new_fd);
-                        events[n].data.fd = -1;
+                        events[i].data.fd = -1;
                         printf("reading1 error");
                     } else {
                         printf("readline error");
@@ -159,7 +162,7 @@ int main(void)
                 } else if(n == 0) {
                     printf("closed new_fd");
                     close(new_fd);
-                    events[n].data.fd = -1;
+                    events[i].data.fd = -1;
                 }
 
                 printf("received data: %s\n", line);
@@ -169,9 +172,9 @@ int main(void)
                 // errror caused by this :
                 epoll_ctl(epfd, EPOLL_CTL_MOD, new_fd, &ev);
             }
-            else if(events[n].events & EPOLLOUT) {
+            else if(events[i].events & EPOLLOUT) {
                 printf("Out called");
-                new_fd = events[n].data.fd;
+                new_fd = events[i].data.fd;
                 write(new_fd, line, n);
 
                 printf("written data: %s\n", line);
